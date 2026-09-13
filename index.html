@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>がっこう時計</title>
+    <style>
+        :root {
+            /* 刺激の少ないアースカラー・パステルカラーのパレット */
+            --bg-color: #f7f6f2; /* 優しいオフホワイト */
+            --panel-bg: #ffffff;
+            --text-main: #4a4a4a;
+            --text-sub: #8c8c8c;
+            --accent-color: #a3c2ba; /* 落ち着いたグリーン */
+            --accent-dark: #7b9e95;
+            --border-color: #e5e3dc;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden; /* スクロール禁止 */
+        }
+
+        /* ヘッダーのコントロール部分 */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 32px;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        select, button {
+            font-size: 16px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            outline: none;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: var(--accent-color);
+        }
+
+        /* トグルスイッチ */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--accent-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .current-date {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        /* メインコンテンツエリア */
+        main {
+            display: flex;
+            flex: 1;
+            padding: 32px;
+            gap: 32px;
+        }
+
+        /* 左側：デジタル情報 */
+        .info-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background-color: var(--panel-bg);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+        }
+
+        .current-period {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .period-label {
+            font-size: 24px;
+            color: var(--text-sub);
+            margin-bottom: 8px;
+        }
+
+        .period-name {
+            font-size: 4vw; /* 画面サイズに応じたダイナミックなサイズ */
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 16px;
+            color: var(--text-main);
+        }
+
+        .period-time {
+            font-size: 2.5vw;
+            color: var(--accent-dark);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* 右側：アナログ時計 */
+        .clock-panel {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--panel-bg);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            padding: 24px;
+        }
+
+        .clock-svg {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.05));
+        }
+
+        /* 時計の要素スタイル */
+        .clock-face { fill: #ddaaaa; stroke: var(--border-color); stroke-width: 4; }
+        .clock-number { font-size: 28px; font-weight: bold; fill: var(--text-sub); text-anchor: middle; dominant-baseline: central; }
+        .clock-tick { stroke: var(--text-sub); stroke-width: 2; }
+        .clock-tick-major { stroke: var(--text-main); stroke-width: 4; }
+        
+        .timer-arc { fill: rgba(163, 194, 186, 0.4); transition: opacity 0.3s ease; }
+        .timer-arc.hidden { opacity: 0; }
+        
+        .end-hand { stroke: var(--accent-color); stroke-linecap: round; transition: opacity 0.3s ease; }
+        .end-hand.hidden { opacity: 0; }
+        
+        .hour-hand { stroke: var(--text-main); stroke-width: 10; stroke-linecap: round; }
+        .minute-hand { stroke: var(--text-main); stroke-width: 6; stroke-linecap: round; }
+        .center-dot { fill: var(--text-main); }
+        .center-dot-inner { fill: #ffffff; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="current-date" id="date-display">2026年9月14日 (月)</div>
+        <div class="controls">
+            <div class="control-group">
+                <label for="grade-select">学年:</label>
+                <select id="grade-select">
+                    <option value="1">1年生</option>
+                    <option value="2">2年生</option>
+                    <option value="3">3年生</option>
+                    <option value="4">4年生</option>
+                    <option value="5">5年生</option>
+                    <option value="6">6年生</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="friday-control" style="display: none;">
+                <label for="friday-select">金曜日の予定:</label>
+                <select id="friday-select">
+                    <option value="normal">通常</option>
+                    <option value="club">クラブの日</option>
+                    <option value="committee">委員会の日</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="timer-toggle">残り時間の可視化:</label>
+                <label class="switch">
+                    <input type="checkbox" id="timer-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="control-group" style="margin-left: 16px; padding-left: 16px; border-left: 1px solid var(--border-color);">
+                <label for="test-mode-toggle" style="color: #c98a8a; font-size: 14px; cursor: pointer;">[テスト]</label>
+                <input type="checkbox" id="test-mode-toggle">
+                <select id="test-day-select" style="display:none; padding:4px; font-size:14px; width: 60px;">
+                    <option value="1">月</option>
+                    <option value="2">火</option>
+                    <option value="3">水</option>
+                    <option value="4">木</option>
+                    <option value="5" selected>金</option>
+                </select>
+                <input type="time" id="test-time-input" value="13:20" style="display:none; padding:4px; font-size:14px;">
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="info-panel">
+            <div class="current-period">
+                <div class="period-label">いまのじかん</div>
+                <div class="period-name" id="period-name">--</div>
+                <div class="period-time" id="period-time">
+                    <span id="period-start">--:--</span>
+                    <span>〜</span>
+                    <span id="period-end">--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="clock-panel">
+            <svg class="clock-svg" viewBox="0 0 400 400">
+                <!-- 文字盤 -->
+                <circle class="clock-face" cx="200" cy="200" r="190"></circle>
+                
+                <!-- タイマーの扇形 -->
+                <path id="timer-arc" class="timer-arc" d=""></path>
+
+                <!-- 目盛りと数字 (JavaScriptで生成) -->
+                <g id="clock-marks"></g>
+
+                <!-- 終わりの分針 -->
+                <line id="end-hand" class="end-hand" x1="200" y1="200" x2="200" y2="40" stroke-width="8"></line>
+
+                <!-- 時計の針 -->
+                <line id="hour-hand" class="hour-hand" x1="200" y1="200" x2="200" y2="100"></line>
+                <line id="minute-hand" class="minute-hand" x1="200" y1="200" x2="200" y2="50"></line>
+                
+                <!-- 中心の丸 -->
+                <circle class="center-dot" cx="200" cy="200" r="12"></circle>
+                <circle class="center-dot-inner" cx="200" cy="200" r="4"></circle>
+            </svg>
+        </div>
+    </main>
+
+    <script>
+        // --- 設定と状態 ---
+        let currentGrade = 1;
+        let fridayType = 'normal';
+        let isTimerEnabled = true;
+
+        // UI要素
+        const gradeSelect = document.getElementById('grade-select');
+        const fridaySelect = document.getElementById('friday-select');
+        const fridayControl = document.getElementById('friday-control');
+        const timerToggle = document.getElementById('timer-toggle');
+        const testModeToggle = document.getElementById('test-mode-toggle');
+        const testDaySelect = document.getElementById('test-day-select');
+        const testTimeInput = document.getElementById('test-time-input');
+        
+        const periodNameEl = document.getElementById('period-name');
+        const periodStartEl = document.getElementById('period-start');
+        const periodEndEl = document.getElementById('period-end');
+        const dateDisplayEl = document.getElementById('date-display');
+
+        const hourHand = document.getElementById('hour-hand');
+        const minuteHand = document.getElementById('minute-hand');
+        const endHand = document.getElementById('end-hand');
+        const timerArc = document.getElementById('timer-arc');
+        const clockMarksGroup = document.getElementById('clock-marks');
+
+        // --- スケジュールデータ ---
+        const commonSchedule = [
+            { name: "朝の準備", start: "08:10", end: "08:25" },
+            { name: "朝の会", start: "08:25", end: "08:35" },
+            { name: "1校時", start: "08:35", end: "09:15" },
+            { name: "授業準備", start: "09:15", end: "09:20" },
+            { name: "2校時", start: "09:20", end: "10:00" },
+            { name: "3校時", start: "10:00", end: "10:40" },
+            { name: "特別中休み", start: "10:40", end: "11:00" },
+            { name: "授業準備", start: "11:00", end: "11:05" },
+            { name: "4校時", start: "11:05", end: "11:45" },
+            { name: "5校時", start: "11:45", end: "12:25" },
+            { name: "給食", start: "12:25", end: "13:10" }
+        ];
+
+        function getSchedule(dayOfWeek, grade, friType) {
+            let afternoon = [];
+            if (dayOfWeek === 1) { // 月曜日
+                if (grade === 1) {
+                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                } else {
+                    afternoon = [
+                        { name: "読書清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "6校時", start: "13:25", end: "14:25" }, // 月の6校時は60分
+                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                    ];
+                }
+            } else if (dayOfWeek === 2 || dayOfWeek === 4) { // 火・木曜日
+                if (grade === 1 || grade === 2) {
+                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                } else {
+                    afternoon = [
+                        { name: "掃除", start: "13:10", end: "13:30" },
+                        { name: "授業準備", start: "13:30", end: "13:45" },
+                        { name: "6校時", start: "13:45", end: "14:45" }, // 火・木の6校時は60分
+                        { name: "休憩", start: "14:45", end: "14:50" },
+                        { name: "帰りの会", start: "14:50", end: "15:05" }
+                    ];
+                }
+            } else if (dayOfWeek === 3) { // 水曜日
+                if (grade === 1) {
+                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                } else {
+                    afternoon = [
+                        { name: "昼休み", start: "13:10", end: "13:30" },
+                        { name: "6校時", start: "13:30", end: "14:15" }, // 水の6校時は45分
+                        { name: "帰りの会", start: "14:15", end: "14:20" }
+                    ];
+                }
+            } else if (dayOfWeek === 5) { // 金曜日
+                let has6th = true; // デフォルトは全学年6時間
+                if (friType === 'club' && grade <= 3) {
+                    has6th = false; // クラブの日は1〜3年は5時間
+                } else if (friType === 'committee' && grade <= 4) {
+                    has6th = false; // 委員会の日は1〜4年は5時間
+                }
+
+                if (!has6th) {
+                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                } else {
+                    afternoon = [
+                        { name: "簡易清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "6校時", start: "13:25", end: "14:25" }, // 金の6校時は60分
+                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                    ];
+                }
+            } else {
+                return []; // 土日
+            }
+            return [...commonSchedule, ...afternoon];
+        }
+
+        // 時刻文字列を分（深夜0時からの分数）に変換
+        function timeToMinutes(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        // --- 時計描画初期化 ---
+        function initClockMarks() {
+            const cx = 200, cy = 200, rOuter = 185, rInnerMajor = 165, rInnerMinor = 175, rText = 140;
+            let html = '';
+            for (let i = 0; i < 60; i++) {
+                const angle = (i * 6 - 90) * (Math.PI / 180);
+                const xOuter = cx + rOuter * Math.cos(angle);
+                const yOuter = cy + rOuter * Math.sin(angle);
+                
+                if (i % 5 === 0) {
+                    // 大目盛り
+                    const xInner = cx + rInnerMajor * Math.cos(angle);
+                    const yInner = cy + rInnerMajor * Math.sin(angle);
+                    html += `<line class="clock-tick-major" x1="${xInner}" y1="${yInner}" x2="${xOuter}" y2="${yOuter}"></line>`;
+                    
+                    // 数字
+                    let num = i / 5;
+                    if (num === 0) num = 12;
+                    const xText = cx + rText * Math.cos(angle);
+                    const yText = cy + rText * Math.sin(angle);
+                    html += `<text class="clock-number" x="${xText}" y="${yText}">${num}</text>`;
+                } else {
+                    // 小目盛り
+                    const xInner = cx + rInnerMinor * Math.cos(angle);
+                    const yInner = cy + rInnerMinor * Math.sin(angle);
+                    html += `<line class="clock-tick" x1="${xInner}" y1="${yInner}" x2="${xOuter}" y2="${yOuter}"></line>`;
+                }
+            }
+            clockMarksGroup.innerHTML = html;
+        }
+
+        // SVG円弧パスの生成関数 (中心200,200、半径175)
+        function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+            const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
+            return {
+                x: centerX + (radius * Math.cos(angleInRadians)),
+                y: centerY + (radius * Math.sin(angleInRadians))
+            };
+        }
+
+        function describeArc(x, y, radius, startAngle, endAngle){
+            // 角度が負や逆転した場合の正規化
+            let diff = endAngle - startAngle;
+            if (diff < 0) diff += 360;
+            if (diff === 0) return "";
+            if (diff > 359.9) diff = 359.9; // 360度だと描画がバグるため
+            const normalizedEnd = startAngle + diff;
+
+            const start = polarToCartesian(x, y, radius, normalizedEnd);
+            const end = polarToCartesian(x, y, radius, startAngle);
+            const largeArcFlag = diff <= 180 ? "0" : "1";
+
+            return [
+                "M", start.x, start.y, 
+                "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y,
+                "L", x, y,
+                "Z"
+            ].join(" ");
+        }
+
+        // --- メインループ ---
+        function update() {
+            let h, m, s, ms, dayOfWeek;
+            const now = new Date();
+            const isTest = testModeToggle.checked;
+
+            if (isTest) {
+                const timeParts = testTimeInput.value.split(':');
+                h = parseInt(timeParts[0], 10) || 0;
+                m = parseInt(timeParts[1], 10) || 0;
+                s = 0;
+                ms = 0;
+                dayOfWeek = parseInt(testDaySelect.value, 10);
+            } else {
+                h = now.getHours();
+                m = now.getMinutes();
+                s = now.getSeconds();
+                ms = now.getMilliseconds();
+                dayOfWeek = now.getDay();
+            }
+
+            const currentMinutes = h * 60 + m + s / 60; // 分単位（小数付き）
+
+            // 日付・曜日更新
+            const days = ["日", "月", "火", "水", "木", "金", "土"];
+            if (isTest) {
+                dateDisplayEl.textContent = `[テスト] ${days[dayOfWeek]}曜日 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                dateDisplayEl.style.color = '#c98a8a';
+            } else {
+                dateDisplayEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 (${days[dayOfWeek]})`;
+                dateDisplayEl.style.color = 'var(--text-main)';
+            }
+
+            // 金曜日設定UIの表示制御
+            if (dayOfWeek === 5) {
+                fridayControl.style.display = 'flex';
+            } else {
+                fridayControl.style.display = 'none';
+            }
+
+            // スケジュールの取得と現在のコマの特定
+            const schedule = getSchedule(dayOfWeek, currentGrade, fridayType);
+            
+            let currentPeriod = null;
+            let isSchoolTime = false;
+
+            if (schedule.length > 0) {
+                const startTime = timeToMinutes(schedule[0].start);
+                const endTime = timeToMinutes(schedule[schedule.length - 1].end);
+                
+                if (currentMinutes >= startTime && currentMinutes < endTime) {
+                    isSchoolTime = true;
+                    for (const p of schedule) {
+                        const startM = timeToMinutes(p.start);
+                        const endM = timeToMinutes(p.end);
+                        if (currentMinutes >= startM && currentMinutes < endM) {
+                            currentPeriod = p;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // デジタル表示の更新
+            if (currentPeriod) {
+                periodNameEl.textContent = currentPeriod.name;
+                periodStartEl.textContent = currentPeriod.start;
+                periodEndEl.textContent = currentPeriod.end;
+            } else {
+                periodNameEl.textContent = isSchoolTime ? "（時間外または休み時間）" : "放課後 / 登校前";
+                periodStartEl.textContent = "--:--";
+                periodEndEl.textContent = "--:--";
+            }
+
+            // 時計の針の角度計算
+            const hourAngle = (h % 12) * 30 + m * 0.5;
+            const minuteAngle = m * 6 + s * 0.1;
+
+            hourHand.setAttribute("transform", `rotate(${hourAngle}, 200, 200)`);
+            minuteHand.setAttribute("transform", `rotate(${minuteAngle}, 200, 200)`);
+
+            // 残り時間（扇形）と終わりの針の描画
+            if (currentPeriod && isTimerEnabled) {
+                endHand.classList.remove('hidden');
+                timerArc.classList.remove('hidden');
+
+                const endMinsStr = currentPeriod.end.split(':')[1];
+                const endMins = parseInt(endMinsStr, 10);
+                const endAngle = endMins * 6;
+
+                endHand.setAttribute("transform", `rotate(${endAngle}, 200, 200)`);
+                
+                // 現在の分（秒含む）の角度から、終了時の分の角度までを描画
+                // ※時計回りに進むので startAngle = minuteAngle, endAngle = endAngle
+                timerArc.setAttribute("d", describeArc(200, 200, 175, minuteAngle, endAngle));
+            } else {
+                endHand.classList.add('hidden');
+                timerArc.classList.add('hidden');
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // --- イベントリスナー設定 ---
+        gradeSelect.addEventListener('change', (e) => {
+            currentGrade = parseInt(e.target.value, 10);
+        });
+
+        fridaySelect.addEventListener('change', (e) => {
+            fridayType = e.target.value;
+        });
+
+        timerToggle.addEventListener('change', (e) => {
+            isTimerEnabled = e.target.checked;
+        });
+
+        testModeToggle.addEventListener('change', (e) => {
+            const isTest = e.target.checked;
+            testDaySelect.style.display = isTest ? 'inline-block' : 'none';
+            testTimeInput.style.display = isTest ? 'inline-block' : 'none';
+        });
+
+        // --- 初期化と開始 ---
+        initClockMarks();
+        update();
+
+    </script>
+</body>
+</html>
