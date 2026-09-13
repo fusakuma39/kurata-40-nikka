@@ -456,6 +456,35 @@
             ].join(" ");
         }
 
+        const hiraganaMap = {
+            "朝の準備": "あさのじゅんび",
+            "朝の会": "あさのかい",
+            "1校時": "1こうじ",
+            "授業準備": "じゅぎょうじゅんび",
+            "2校時": "2こうじ",
+            "3校時": "3こうじ",
+            "特別中休み": "とくべつなかやすみ",
+            "4校時": "4こうじ",
+            "5校時": "5こうじ",
+            "給食": "きゅうしょく",
+            "帰りの会": "かえりのかい",
+            "読書清掃・授業準備": "どくしょせいそう・じゅぎょうじゅんび",
+            "6校時": "6こうじ",
+            "掃除": "そうじ",
+            "休憩": "きゅうけい",
+            "昼休み": "ひるやすみ",
+            "簡易清掃・授業準備": "かんいせいそう・じゅぎょうじゅんび",
+            "放課後 / 登校前": "ほうかご / とうこうまえ",
+            "（時間外または休み時間）": "（じかんがい または やすみじかん）"
+        };
+        
+        function toHiragana(text) {
+            if (currentGrade <= 3) {
+                return hiraganaMap[text] || text;
+            }
+            return text;
+        }
+
         // --- メインループ ---
         function update() {
             let h, m, s, ms, dayOfWeek;
@@ -481,11 +510,23 @@
 
             // 日付・曜日更新
             const days = ["日", "月", "火", "水", "木", "金", "土"];
+            const daysHiragana = ["にち", "げつ", "か", "すい", "もく", "きん", "ど"];
+            const isHiragana = currentGrade <= 3;
+            const dayStr = isHiragana ? daysHiragana[dayOfWeek] : days[dayOfWeek];
+
             if (isTest) {
-                dateDisplayEl.textContent = `[テスト] ${days[dayOfWeek]}曜日 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                const youbi = isHiragana ? "ようび" : "曜日";
+                dateDisplayEl.textContent = `[テスト] ${dayStr}${youbi} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
                 dateDisplayEl.style.color = '#c98a8a';
             } else {
-                dateDisplayEl.textContent = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 (${days[dayOfWeek]})`;
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1;
+                const date = now.getDate();
+                if (isHiragana) {
+                    dateDisplayEl.textContent = `${year}ねん${month}がつ${date}にち (${dayStr})`;
+                } else {
+                    dateDisplayEl.textContent = `${year}年${month}月${date}日 (${dayStr})`;
+                }
                 dateDisplayEl.style.color = 'var(--text-main)';
             }
 
@@ -521,11 +562,11 @@
 
             // デジタル表示の更新
             if (currentPeriod) {
-                periodNameEl.textContent = currentPeriod.name;
+                periodNameEl.textContent = toHiragana(currentPeriod.name);
                 periodStartEl.textContent = currentPeriod.start;
                 periodEndEl.textContent = currentPeriod.end;
             } else {
-                periodNameEl.textContent = isSchoolTime ? "（時間外または休み時間）" : "放課後 / 登校前";
+                periodNameEl.textContent = toHiragana(isSchoolTime ? "（時間外または休み時間）" : "放課後 / 登校前");
                 periodStartEl.textContent = "--:--";
                 periodEndEl.textContent = "--:--";
             }
