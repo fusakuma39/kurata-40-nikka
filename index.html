@@ -203,6 +203,51 @@
         .center-dot { fill: var(--text-main); }
         .center-dot-inner { fill: #ffffff; }
 
+        /* スプリットビュー（幅が狭い場合）のスタイル */
+        @media (max-width: 800px) {
+            header {
+                display: none !important;
+            }
+            body {
+                background-color: var(--panel-bg);
+            }
+            main {
+                flex-direction: column;
+                padding: 16px;
+                gap: 8px;
+                justify-content: center;
+                align-items: center;
+            }
+            .info-panel {
+                flex: 0 0 auto;
+                width: 100%;
+                padding: 0;
+                box-shadow: none;
+                background-color: transparent;
+            }
+            .current-period {
+                align-items: center;
+            }
+            .period-label, .period-time {
+                display: none !important;
+            }
+            .period-name {
+                font-size: 40px;
+                margin-bottom: 0;
+                text-align: center;
+            }
+            .clock-panel {
+                flex: 1;
+                width: 100%;
+                padding: 0;
+                box-shadow: none;
+                background-color: transparent;
+                align-items: flex-start;
+            }
+            .clock-svg {
+                max-width: 90vmin;
+            }
+        }
     </style>
 </head>
 <body>
@@ -321,15 +366,15 @@
         // --- スケジュールデータ ---
         const commonSchedule = [
             { name: "朝の準備", start: "08:10", end: "08:25" },
-            { name: "朝の会", start: "08:25", end: "08:35" },
-            { name: "1校時", start: "08:35", end: "09:15" },
+            { name: "朝会・朝の準備", start: "08:25", end: "08:35" },
+            { name: "1時間目", start: "08:35", end: "09:15" },
             { name: "授業準備", start: "09:15", end: "09:20" },
-            { name: "2校時", start: "09:20", end: "10:00" },
-            { name: "3校時", start: "10:00", end: "10:40" },
+            { name: "2時間目", start: "09:20", end: "10:00" },
+            { name: "3時間目", start: "10:00", end: "10:40" },
             { name: "特別中休み", start: "10:40", end: "11:00" },
             { name: "授業準備", start: "11:00", end: "11:05" },
-            { name: "4校時", start: "11:05", end: "11:45" },
-            { name: "5校時", start: "11:45", end: "12:25" },
+            { name: "4時間目", start: "11:05", end: "11:45" },
+            { name: "5時間目", start: "11:45", end: "12:25" },
             { name: "給食", start: "12:25", end: "13:10" }
         ];
 
@@ -337,52 +382,86 @@
             let afternoon = [];
             if (dayOfWeek === 1) { // 月曜日
                 if (grade === 1) {
-                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                    afternoon = [
+                        { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "帰りの会", start: "13:25", end: "13:35" }
+                    ];
                 } else {
                     afternoon = [
-                        { name: "読書清掃・授業準備", start: "13:10", end: "13:25" },
-                        { name: "6校時", start: "13:25", end: "14:25" }, // 月の6校時は60分
+                        { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "6時間目", start: "13:25", end: "14:25" },
                         { name: "帰りの会", start: "14:25", end: "14:40" }
                     ];
                 }
             } else if (dayOfWeek === 2 || dayOfWeek === 4) { // 火・木曜日
                 if (grade === 1 || grade === 2) {
-                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                    afternoon = [
+                        { name: "掃除", start: "13:10", end: "13:30" },
+                        { name: "帰りの会", start: "13:30", end: "13:45" }
+                    ];
                 } else {
                     afternoon = [
                         { name: "掃除", start: "13:10", end: "13:30" },
-                        { name: "授業準備", start: "13:30", end: "13:45" },
-                        { name: "6校時", start: "13:45", end: "14:45" }, // 火・木の6校時は60分
-                        { name: "休憩", start: "14:45", end: "14:50" },
+                        { name: "昼休み", start: "13:30", end: "13:45" },
+                        { name: "授業準備", start: "13:45", end: "13:50" },
+                        { name: "6時間目", start: "13:50", end: "14:50" },
                         { name: "帰りの会", start: "14:50", end: "15:05" }
                     ];
                 }
             } else if (dayOfWeek === 3) { // 水曜日
                 if (grade === 1) {
-                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
+                    afternoon = [
+                        { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "帰りの会", start: "13:25", end: "13:35" }
+                    ];
                 } else {
                     afternoon = [
-                        { name: "昼休み", start: "13:10", end: "13:30" },
-                        { name: "6校時", start: "13:30", end: "14:15" }, // 水の6校時は45分
-                        { name: "帰りの会", start: "14:15", end: "14:20" }
+                        { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "6時間目", start: "13:25", end: "14:05" },
+                        { name: "帰りの会", start: "14:05", end: "14:20" }
                     ];
                 }
             } else if (dayOfWeek === 5) { // 金曜日
-                let has6th = true; // デフォルトは全学年6時間
-                if (friType === 'club' && grade <= 3) {
-                    has6th = false; // クラブの日は1〜3年は5時間
-                } else if (friType === 'committee' && grade <= 4) {
-                    has6th = false; // 委員会の日は1〜4年は5時間
-                }
-
-                if (!has6th) {
-                    afternoon = [{ name: "帰りの会", start: "13:10", end: "13:25" }];
-                } else {
+                if (friType === 'normal') {
                     afternoon = [
-                        { name: "簡易清掃・授業準備", start: "13:10", end: "13:25" },
-                        { name: "6校時", start: "13:25", end: "14:25" }, // 金の6校時は60分
-                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                        { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                        { name: "6時間目", start: "13:25", end: "14:05" },
+                        { name: "帰りの会", start: "14:05", end: "14:20" }
                     ];
+                } else if (friType === 'club') {
+                    if (grade === 1) {
+                        afternoon = [
+                            { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                            { name: "帰りの会", start: "13:25", end: "13:35" }
+                        ];
+                    } else if (grade === 2 || grade === 3) {
+                        afternoon = [
+                            { name: "帰りの会", start: "13:10", end: "13:25" }
+                        ];
+                    } else { // 4,5,6
+                        afternoon = [
+                            { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                            { name: "クラブ", start: "13:25", end: "14:25" },
+                            { name: "帰りの会", start: "14:25", end: "14:40" }
+                        ];
+                    }
+                } else if (friType === 'committee') {
+                    if (grade === 1) {
+                        afternoon = [
+                            { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                            { name: "帰りの会", start: "13:25", end: "13:35" }
+                        ];
+                    } else if (grade >= 2 && grade <= 4) {
+                        afternoon = [
+                            { name: "帰りの会", start: "13:10", end: "13:25" }
+                        ];
+                    } else { // 5,6
+                        afternoon = [
+                            { name: "簡単清掃・授業準備", start: "13:10", end: "13:25" },
+                            { name: "委員会", start: "13:25", end: "14:25" },
+                            { name: "帰りの会", start: "14:25", end: "14:40" }
+                        ];
+                    }
                 }
             } else {
                 return []; // 土日
@@ -458,22 +537,22 @@
 
         const hiraganaMap = {
             "朝の準備": "あさのじゅんび",
-            "朝の会": "あさのかい",
-            "1校時": "1こうじ",
+            "朝会・朝の準備": "ちょうかい・あさのじゅんび",
+            "1時間目": "1じかんめ",
             "授業準備": "じゅぎょうじゅんび",
-            "2校時": "2こうじ",
-            "3校時": "3こうじ",
+            "2時間目": "2じかんめ",
+            "3時間目": "3じかんめ",
             "特別中休み": "とくべつなかやすみ",
-            "4校時": "4こうじ",
-            "5校時": "5こうじ",
+            "4時間目": "4じかんめ",
+            "5時間目": "5じかんめ",
             "給食": "きゅうしょく",
             "帰りの会": "かえりのかい",
-            "読書清掃・授業準備": "どくしょせいそう・じゅぎょうじゅんび",
-            "6校時": "6こうじ",
+            "簡単清掃・授業準備": "かんたんせいそう・じゅぎょうじゅんび",
+            "6時間目": "6じかんめ",
             "掃除": "そうじ",
-            "休憩": "きゅうけい",
             "昼休み": "ひるやすみ",
-            "簡易清掃・授業準備": "かんいせいそう・じゅぎょうじゅんび",
+            "クラブ": "くらぶ",
+            "委員会": "いいんかい",
             "放課後 / 登校前": "ほうかご / とうこうまえ",
             "（時間外または休み時間）": "（じかんがい または やすみじかん）"
         };
