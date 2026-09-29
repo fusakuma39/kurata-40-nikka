@@ -378,8 +378,19 @@
             { name: "給食", start: "12:25", end: "13:10" }
         ];
 
-        function getSchedule(dayOfWeek, grade, friType) {
+        function getSchedule(dayOfWeek, grade, friType, isSpecialSept30) {
             let afternoon = [];
+
+            // 9月30日の特別日課 (1・2年生のみ)
+            if (isSpecialSept30 && (grade === 1 || grade === 2)) {
+                afternoon = [
+                    { name: "掃除", start: "13:10", end: "13:35" },
+                    { name: "5時間目", start: "13:35", end: "14:15" },
+                    { name: "帰りの会", start: "14:15", end: "14:30" }
+                ];
+                return [...commonSchedule, ...afternoon];
+            }
+
             if (dayOfWeek === 1) { // 月曜日
                 if (grade === 1) {
                     afternoon = [
@@ -616,8 +627,10 @@
                 fridayControl.style.display = 'none';
             }
 
+            const isSpecialSept30 = now.getFullYear() === 2026 && now.getMonth() === 8 && now.getDate() === 30;
+
             // スケジュールの取得と現在のコマの特定
-            const schedule = getSchedule(dayOfWeek, currentGrade, fridayType);
+            const schedule = getSchedule(dayOfWeek, currentGrade, fridayType, isSpecialSept30);
             
             let currentPeriod = null;
             let isSchoolTime = false;
