@@ -256,6 +256,14 @@
         <div class="current-date" id="date-display">2026年9月14日 (月)</div>
         <div class="controls">
             <div class="control-group">
+                <label for="lesson-mode-select">時程:</label>
+                <select id="lesson-mode-select">
+                    <option value="45" selected>45分日課</option>
+                    <option value="40">40分日課</option>
+                </select>
+            </div>
+
+            <div class="control-group">
                 <label for="grade-select">学年:</label>
                 <select id="grade-select">
                     <option value="1">1年生</option>
@@ -287,13 +295,7 @@
             <div class="control-group" style="margin-left: 16px; padding-left: 16px; border-left: 1px solid var(--border-color);">
                 <label for="test-mode-toggle" style="color: #c98a8a; font-size: 14px; cursor: pointer;">[テスト]</label>
                 <input type="checkbox" id="test-mode-toggle">
-                <select id="test-day-select" style="display:none; padding:4px; font-size:14px; width: 60px;">
-                    <option value="1">月</option>
-                    <option value="2">火</option>
-                    <option value="3">水</option>
-                    <option value="4">木</option>
-                    <option value="5" selected>金</option>
-                </select>
+                <input type="date" id="test-date-input" style="display:none; padding:4px; font-size:14px;">
                 <input type="time" id="test-time-input" value="13:20" style="display:none; padding:4px; font-size:14px;">
             </div>
         </div>
@@ -342,14 +344,16 @@
         let currentGrade = 1;
         let fridayType = 'normal';
         let isTimerEnabled = true;
+        let lessonMode = '45'; // '45' または '40'
 
         // UI要素
+        const lessonModeSelect = document.getElementById('lesson-mode-select');
         const gradeSelect = document.getElementById('grade-select');
         const fridaySelect = document.getElementById('friday-select');
         const fridayControl = document.getElementById('friday-control');
         const timerToggle = document.getElementById('timer-toggle');
         const testModeToggle = document.getElementById('test-mode-toggle');
-        const testDaySelect = document.getElementById('test-day-select');
+        const testDateInput = document.getElementById('test-date-input');
         const testTimeInput = document.getElementById('test-time-input');
         
         const periodNameEl = document.getElementById('period-name');
@@ -363,33 +367,179 @@
         const timerArc = document.getElementById('timer-arc');
         const clockMarksGroup = document.getElementById('clock-marks');
 
-        // --- スケジュールデータ ---
-        const commonSchedule = [
-            { name: "朝の準備", start: "08:10", end: "08:25" },
-            { name: "朝会・朝の準備", start: "08:25", end: "08:35" },
-            { name: "1時間目", start: "08:35", end: "09:15" },
-            { name: "授業準備", start: "09:15", end: "09:20" },
-            { name: "2時間目", start: "09:20", end: "10:00" },
-            { name: "3時間目", start: "10:00", end: "10:40" },
-            { name: "特別中休み", start: "10:40", end: "11:00" },
-            { name: "授業準備", start: "11:00", end: "11:05" },
-            { name: "4時間目", start: "11:05", end: "11:45" },
-            { name: "5時間目", start: "11:45", end: "12:25" },
-            { name: "給食", start: "12:25", end: "13:10" }
-        ];
+        // --- 前期・後期自動判定 ---
+        // 前期: 4月1日 〜 10月第2週まで（10月の第2日曜日まで）
+        // 後期: 10月第3週 〜 3月31日
+        function isFirstSemester(date) {
+            const month = date.getMonth() + 1;
+            if (month >= 4 && month <= 9) return true;
+            if (month === 10) {
+                const year = date.getFullYear();
+                const firstDay = new Date(year, 9, 1).getDay(); // 10月1日の曜日 (0:日〜6:土)
+                const firstSunday = (7 - firstDay) % 7 + 1;     // 第1日曜日
+                const secondSunday = firstSunday + 7;            // 第2日曜日
+                return date.getDate() <= secondSunday;
+            }
+            return false;
+        }
 
-        function getSchedule(dayOfWeek, grade, friType, isSpecialSept30) {
+        // --- スケジュールデータ ---
+
+        // 45分時程（標準時程）
+        function getStandardSchedule(dayOfWeek, grade, isFirstSem, friType) {
+            let morningActivity = "朝学習";
+            if (dayOfWeek === 2) morningActivity = "朝会";
+            if (dayOfWeek === 5) morningActivity = "集会";
+
+            const common = [
+                { name: "朝の準備", start: "08:10", end: "08:25" },
+                { name: morningActivity, start: "08:25", end: "08:40" },
+                { name: "朝の会", start: "08:40", end: "08:45" },
+                { name: "1時間目", start: "08:45", end: "09:30" },
+                { name: "授業準備", start: "09:30", end: "09:35" },
+                { name: "2時間目", start: "09:35", end: "10:20" },
+                { name: "中休み", start: "10:20", end: "10:35" },
+                { name: "授業準備", start: "10:35", end: "10:40" },
+                { name: "3時間目", start: "10:40", end: "11:25" },
+                { name: "授業準備", start: "11:25", end: "11:30" },
+                { name: "4時間目", start: "11:30", end: "12:15" },
+                { name: "給食", start: "12:15", end: "13:00" }
+            ];
+
             let afternoon = [];
 
-            // 9月30日の特別日課 (1・2年生のみ)
-            if (isSpecialSept30 && (grade === 1 || grade === 2)) {
-                afternoon = [
-                    { name: "掃除", start: "13:10", end: "13:35" },
-                    { name: "5時間目", start: "13:35", end: "14:15" },
-                    { name: "帰りの会", start: "14:15", end: "14:30" }
-                ];
-                return [...commonSchedule, ...afternoon];
+            if (dayOfWeek === 1) { // 月曜日
+                // 1年: 4時間(13:35下校), 2〜6年: 5時間(14:40下校)
+                if (grade === 1) {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "帰りの会", start: "13:20", end: "13:35" }
+                    ];
+                } else {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "昼休み", start: "13:20", end: "13:35" },
+                        { name: "授業準備", start: "13:35", end: "13:40" },
+                        { name: "5時間目", start: "13:40", end: "14:25" },
+                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                    ];
+                }
+            } else if (dayOfWeek === 2) { // 火曜日
+                // 1・2年: 5時間(14:40下校)
+                // 3年: 前期は5時間(14:40下校)、後期は6時間(15:30下校)
+                // 4〜6年: 6時間(15:30下校)
+                const isFivePeriods = (grade === 1 || grade === 2 || (grade === 3 && isFirstSem));
+                if (isFivePeriods) {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "昼休み", start: "13:20", end: "13:35" },
+                        { name: "授業準備", start: "13:35", end: "13:40" },
+                        { name: "5時間目", start: "13:40", end: "14:25" },
+                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                    ];
+                } else {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "昼休み", start: "13:20", end: "13:35" },
+                        { name: "授業準備", start: "13:35", end: "13:40" },
+                        { name: "5時間目", start: "13:40", end: "14:25" },
+                        { name: "授業準備", start: "14:25", end: "14:30" },
+                        { name: "6時間目", start: "14:30", end: "15:15" },
+                        { name: "帰りの会", start: "15:15", end: "15:30" }
+                    ];
+                }
+            } else if (dayOfWeek === 3) { // 水曜日
+                // 1・2年: 4時間(13:35下校), 3〜6年: 5時間(14:20下校)
+                if (grade === 1 || grade === 2) {
+                    afternoon = [
+                        { name: "テキパキそうじ", start: "13:00", end: "13:15" },
+                        { name: "昼休み", start: "13:15", end: "13:20" },
+                        { name: "帰りの会", start: "13:20", end: "13:35" }
+                    ];
+                } else {
+                    afternoon = [
+                        { name: "テキパキそうじ", start: "13:00", end: "13:15" },
+                        { name: "授業準備", start: "13:15", end: "13:20" },
+                        { name: "5時間目", start: "13:20", end: "14:05" },
+                        { name: "帰りの会", start: "14:05", end: "14:20" }
+                    ];
+                }
+            } else if (dayOfWeek === 4) { // 木曜日
+                // 1〜3年: 5時間(14:40下校), 4〜6年: 6時間(15:30下校)
+                if (grade <= 3) {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "昼休み", start: "13:20", end: "13:35" },
+                        { name: "授業準備", start: "13:35", end: "13:40" },
+                        { name: "5時間目", start: "13:40", end: "14:25" },
+                        { name: "帰りの会", start: "14:25", end: "14:40" }
+                    ];
+                } else {
+                    afternoon = [
+                        { name: "そうじ", start: "13:00", end: "13:20" },
+                        { name: "昼休み", start: "13:20", end: "13:35" },
+                        { name: "授業準備", start: "13:35", end: "13:40" },
+                        { name: "5時間目", start: "13:40", end: "14:25" },
+                        { name: "授業準備", start: "14:25", end: "14:30" },
+                        { name: "6時間目", start: "14:30", end: "15:15" },
+                        { name: "帰りの会", start: "15:15", end: "15:30" }
+                    ];
+                }
+            } else if (dayOfWeek === 5) { // 金曜日
+                // 全校5時間(14:20下校)
+                // クラブ設定日: 1〜3年(14:20), 4〜6年(15:30)
+                // 委員会設定日: 1〜4年(14:20), 5・6年(15:30)
+                let isSpecialActivity = false;
+                let activityName = "";
+                if (friType === 'club' && grade >= 4) {
+                    isSpecialActivity = true;
+                    activityName = "クラブ";
+                } else if (friType === 'committee' && grade >= 5) {
+                    isSpecialActivity = true;
+                    activityName = "委員会";
+                }
+
+                if (isSpecialActivity) {
+                    afternoon = [
+                        { name: "テキパキそうじ", start: "13:00", end: "13:15" },
+                        { name: "授業準備", start: "13:15", end: "13:20" },
+                        { name: "5時間目", start: "13:20", end: "14:05" },
+                        { name: "授業準備", start: "14:05", end: "14:20" },
+                        { name: activityName, start: "14:20", end: "15:20" },
+                        { name: "帰りの会", start: "15:20", end: "15:30" }
+                    ];
+                } else {
+                    afternoon = [
+                        { name: "テキパキそうじ", start: "13:00", end: "13:15" },
+                        { name: "授業準備", start: "13:15", end: "13:20" },
+                        { name: "5時間目", start: "13:20", end: "14:05" },
+                        { name: "帰りの会", start: "14:05", end: "14:20" }
+                    ];
+                }
+            } else {
+                return [];
             }
+
+            return [...common, ...afternoon];
+        }
+
+        // 40分時程（短縮時程）
+        function getShortSchedule(dayOfWeek, grade, friType) {
+            const common = [
+                { name: "朝の準備", start: "08:10", end: "08:25" },
+                { name: "朝会・朝の準備", start: "08:25", end: "08:35" },
+                { name: "1時間目", start: "08:35", end: "09:15" },
+                { name: "授業準備", start: "09:15", end: "09:20" },
+                { name: "2時間目", start: "09:20", end: "10:00" },
+                { name: "3時間目", start: "10:00", end: "10:40" },
+                { name: "特別中休み", start: "10:40", end: "11:00" },
+                { name: "授業準備", start: "11:00", end: "11:05" },
+                { name: "4時間目", start: "11:05", end: "11:45" },
+                { name: "5時間目", start: "11:45", end: "12:25" },
+                { name: "給食", start: "12:25", end: "13:10" }
+            ];
+
+            let afternoon = [];
 
             if (dayOfWeek === 1) { // 月曜日
                 if (grade === 1) {
@@ -475,9 +625,17 @@
                     }
                 }
             } else {
-                return []; // 土日
+                return [];
             }
-            return [...commonSchedule, ...afternoon];
+            return [...common, ...afternoon];
+        }
+
+        function getSchedule(dayOfWeek, grade, friType, mode, isFirstSem) {
+            if (mode === '40') {
+                return getShortSchedule(dayOfWeek, grade, friType);
+            } else {
+                return getStandardSchedule(dayOfWeek, grade, isFirstSem, friType);
+            }
         }
 
         // 時刻文字列を分（深夜0時からの分数）に変換
@@ -527,11 +685,10 @@
         }
 
         function describeArc(x, y, radius, startAngle, endAngle){
-            // 角度が負や逆転した場合の正規化
             let diff = endAngle - startAngle;
             if (diff < 0) diff += 360;
             if (diff === 0) return "";
-            if (diff > 359.9) diff = 359.9; // 360度だと描画がバグるため
+            if (diff > 359.9) diff = 359.9;
             const normalizedEnd = startAngle + diff;
 
             const start = polarToCartesian(x, y, radius, normalizedEnd);
@@ -548,12 +705,16 @@
 
         const hiraganaMap = {
             "朝の準備": "あさのじゅんび",
+            "朝学習": "あさがくしゅう",
+            "朝会": "ちょうかい",
+            "集会": "しゅうかい",
             "朝会・朝の準備": "ちょうかい・あさのじゅんび",
             "1時間目": "1じかんめ",
             "授業準備": "じゅぎょうじゅんび",
             "2時間目": "2じかんめ",
-            "3時間目": "3じかんめ",
+            "中休み": "なかやすみ",
             "特別中休み": "とくべつなかやすみ",
+            "3時間目": "3じかんめ",
             "4時間目": "4じかんめ",
             "5時間目": "5じかんめ",
             "給食": "きゅうしょく",
@@ -561,6 +722,8 @@
             "簡単清掃・授業準備": "かんたんせいそう・じゅぎょうじゅんび",
             "6時間目": "6じかんめ",
             "掃除": "そうじ",
+            "そうじ": "そうじ",
+            "テキパキそうじ": "てきぱきそうじ",
             "昼休み": "ひるやすみ",
             "クラブ": "くらぶ",
             "委員会": "いいんかい",
@@ -577,18 +740,28 @@
 
         // --- メインループ ---
         function update() {
-            let h, m, s, ms, dayOfWeek;
+            let h, m, s, ms, dayOfWeek, currentDateObj;
             const now = new Date();
             const isTest = testModeToggle.checked;
 
             if (isTest) {
+                let testDate;
+                if (testDateInput.value) {
+                    const [yStr, mStr, dStr] = testDateInput.value.split('-');
+                    testDate = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, parseInt(dStr, 10));
+                } else {
+                    testDate = now;
+                }
+                currentDateObj = testDate;
+                dayOfWeek = testDate.getDay();
+
                 const timeParts = testTimeInput.value.split(':');
                 h = parseInt(timeParts[0], 10) || 0;
                 m = parseInt(timeParts[1], 10) || 0;
                 s = 0;
                 ms = 0;
-                dayOfWeek = parseInt(testDaySelect.value, 10);
             } else {
+                currentDateObj = now;
                 h = now.getHours();
                 m = now.getMinutes();
                 s = now.getSeconds();
@@ -597,25 +770,28 @@
             }
 
             const currentMinutes = h * 60 + m + s / 60; // 分単位（小数付き）
+            const isFirstSem = isFirstSemester(currentDateObj);
+            const isHiragana = currentGrade <= 3;
+            const semStr = isFirstSem ? (isHiragana ? "ぜんき" : "前期") : (isHiragana ? "こうき" : "後期");
 
             // 日付・曜日更新
             const days = ["日", "月", "火", "水", "木", "金", "土"];
             const daysHiragana = ["にち", "げつ", "か", "すい", "もく", "きん", "ど"];
-            const isHiragana = currentGrade <= 3;
             const dayStr = isHiragana ? daysHiragana[dayOfWeek] : days[dayOfWeek];
+
+            const year = currentDateObj.getFullYear();
+            const month = currentDateObj.getMonth() + 1;
+            const date = currentDateObj.getDate();
 
             if (isTest) {
                 const youbi = isHiragana ? "ようび" : "曜日";
-                dateDisplayEl.textContent = `[テスト] ${dayStr}${youbi} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                dateDisplayEl.textContent = `[テスト] ${month}/${date}(${dayStr}) [${semStr}] ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
                 dateDisplayEl.style.color = '#c98a8a';
             } else {
-                const year = now.getFullYear();
-                const month = now.getMonth() + 1;
-                const date = now.getDate();
                 if (isHiragana) {
-                    dateDisplayEl.textContent = `${year}ねん${month}がつ${date}にち (${dayStr})`;
+                    dateDisplayEl.textContent = `${year}ねん${month}がつ${date}にち (${dayStr}) [${semStr}]`;
                 } else {
-                    dateDisplayEl.textContent = `${year}年${month}月${date}日 (${dayStr})`;
+                    dateDisplayEl.textContent = `${year}年${month}月${date}日 (${dayStr}) [${semStr}]`;
                 }
                 dateDisplayEl.style.color = 'var(--text-main)';
             }
@@ -627,10 +803,8 @@
                 fridayControl.style.display = 'none';
             }
 
-            const isSpecialSept30 = now.getFullYear() === 2026 && now.getMonth() === 8 && now.getDate() === 30;
-
             // スケジュールの取得と現在のコマの特定
-            const schedule = getSchedule(dayOfWeek, currentGrade, fridayType, isSpecialSept30);
+            const schedule = getSchedule(dayOfWeek, currentGrade, fridayType, lessonMode, isFirstSem);
             
             let currentPeriod = null;
             let isSchoolTime = false;
@@ -680,9 +854,6 @@
                 const endAngle = endMins * 6;
 
                 endHand.setAttribute("transform", `rotate(${endAngle}, 200, 200)`);
-                
-                // 現在の分（秒含む）の角度から、終了時の分の角度までを描画
-                // ※時計回りに進むので startAngle = minuteAngle, endAngle = endAngle
                 timerArc.setAttribute("d", describeArc(200, 200, 175, minuteAngle, endAngle));
             } else {
                 endHand.classList.add('hidden');
@@ -693,6 +864,10 @@
         }
 
         // --- イベントリスナー設定 ---
+        lessonModeSelect.addEventListener('change', (e) => {
+            lessonMode = e.target.value;
+        });
+
         gradeSelect.addEventListener('change', (e) => {
             currentGrade = parseInt(e.target.value, 10);
         });
@@ -707,8 +882,13 @@
 
         testModeToggle.addEventListener('change', (e) => {
             const isTest = e.target.checked;
-            testDaySelect.style.display = isTest ? 'inline-block' : 'none';
+            testDateInput.style.display = isTest ? 'inline-block' : 'none';
             testTimeInput.style.display = isTest ? 'inline-block' : 'none';
+            if (isTest && !testDateInput.value) {
+                const d = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                testDateInput.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            }
         });
 
         // --- 初期化と開始 ---
